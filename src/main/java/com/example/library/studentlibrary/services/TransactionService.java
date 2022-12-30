@@ -46,7 +46,32 @@ public class TransactionService {
 
         //Note that the error message should match exactly in all cases
 
-       return null; //return transactionId instead
+        Transaction currentTransaction = new Transaction();
+
+
+        Book currentBook = bookRepository5.findById(bookId).stream().findFirst().orElse(null);
+        if(currentBook == null || !currentBook.isAvailable())
+            throw new Exception("Book is either unavailable or not present");
+
+        Card currentCard = cardRepository5.findById(cardId).stream().findFirst().orElse(null);
+        if(currentCard == null || currentCard.getCardStatus().equals(CardStatus.DEACTIVATED))
+            throw new Exception("Card is invalid");
+
+        if(currentCard.getBooks().size() >= max_allowed_books)
+            throw new Exception("Book limit has reached for this card");
+
+        currentTransaction.setBook(currentBook);
+        currentTransaction.setCard(currentCard);
+        currentTransaction.setFineAmount(0);
+        currentTransaction.setIssueOperation(true);
+        currentTransaction.setTransactionStatus(TransactionStatus.SUCCESSFUL);
+
+        currentBook.setAvailable(false);
+        currentBook.getTransactions().add(currentTransaction);
+
+        currentCard.getBooks().add(currentBook);
+
+       return currentTransaction.getTransactionId(); //return transactionId instead
     }
 
     public Transaction returnBook(int cardId, int bookId) throws Exception{
@@ -58,7 +83,34 @@ public class TransactionService {
         //make the book available for other users
         //make a new transaction for return book which contains the fine amount as well
 
-        Transaction returnBookTransaction  = null;
+        Date issueDate = transaction.getTransactionDate();
+        Date todayDate = new Date();
+
+        int possessionDays = todayDate.compareTo(issueDate);
+        int fineAmount = 0;
+
+        if(possessionDays > getMax_allowed_days)
+            fineAmount = (possessionDays - getMax_allowed_days)*fine_per_day;
+
+        Book currentBook = bookRepository5.findById(bookId).stream().findFirst().orElse(null);
+
+        Card currentCard =cardRepository5.findById(cardId).stream().findFirst().orElse(null);
+
+        if(currentCard != null)
+            currentCard.getBooks().remove(currentBook);
+
+        Transaction returnBookTransaction  = new Transaction();
+        returnBookTransaction.setBook(currentBook);
+        returnBookTransaction.setCard(currentCard);
+        returnBookTransaction.setFineAmount(fineAmount);
+        returnBookTransaction.setIssueOperation(false);
+        returnBookTransaction.setTransactionStatus(TransactionStatus.SUCCESSFUL);
+
+        if(currentBook != null){
+            currentBook.setAvailable(true);
+            currentBook.getTransactions().add(returnBookTransaction);
+        }
+
         return returnBookTransaction; //return the transaction after updating all details
     }
 }
